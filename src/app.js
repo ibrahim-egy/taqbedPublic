@@ -33,74 +33,50 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(favicon(__dirname + '/public/images/favicon.ico'));
 
-app.use('/login', LoginRoute)
-app.use('/register', RegisterRoute)
-
 
 app.get('/', function (req, res) {
-    res.render('index')
+    res.redirect('/data')
 })
 
 app.route('/data')
     .get(function (req, res) {
 
-        if (req.isAuthenticated()) {
-            let owners = []
-            Owner.find({}, function (err, o) {
-                if (!err) {
-                    o.forEach(owner => {
-                        owners.push(owner.name)
-                    });
-                    res.render('data', {
-                        owners: owners,
-                    })
-                }
-            })
-
-        } else {
-            console.log("Unauthorized")
-            res.redirect('/login')
-        }
+        let owners = []
+        Owner.find({}, function (err, o) {
+            if (!err) {
+                o.forEach(owner => {
+                    owners.push(owner.name)
+                });
+                res.render('data', {
+                    owners: owners,
+                })
+            }
+        })
     })
     .post(function (req, res) {
-        if (req.isAuthenticated()) {
-            ownerName = req.body.name;
-            if (ownerName == '' || ownerName == null) {
-                res.redirect('/data')
+        ownerName = req.body.name;
+        if (ownerName == '' || ownerName == null) {
+            res.redirect('/data')
 
-            } else if (ownerName == "TOTAL") {
-                res.redirect('/total')
-            }
-            else {
-                var string = encodeURIComponent(ownerName);
-                res.redirect('/owner?name=' + string)
-            }
-
-        } else {
-            console.log("Not authorized")
-            res.redirect('/login')
+        } else if (ownerName == "TOTAL") {
+            res.redirect('/total')
+        }
+        else {
+            var string = encodeURIComponent(ownerName);
+            res.redirect('/owner?name=' + string)
         }
     })
 
 app.get('/allOwners', function (req, res) {
 
-    if (req.isAuthenticated()) {
-        Owner.find({}, function (err, owners) {
-            res.render('allOwners', { owners: owners })
-        })
-    } else {
-        res.redirect('/login')
-    }
+    Owner.find({}, function (err, owners) {
+        res.render('allOwners', { owners: owners })
+    })
 })
 
 app.route('/add')
     .get(function (req, res) {
-        if (req.isAuthenticated()) {
-            res.render('add')
-        } else {
-            console.log("Not authorized")
-            res.redirect('/login')
-        }
+        res.render('add')
     })
     .post(function (req, res) {
         const newOwner = new Owner({
@@ -110,8 +86,7 @@ app.route('/add')
             amount: req.body.amount,
             amountPerMonth: req.body.amountPerMonth,
             category: req.body.category,
-            note: req.body.note,
-            byWho: req.user.username
+            note: req.body.note
         })
         newOwner.save(err => {
             if (err) {
@@ -126,24 +101,19 @@ app.route('/add')
     })
 
 
-
 app.route('/owner')
     .get(function (req, res) {
-        if (req.isAuthenticated()) {
-            Owner.find({ name: req.query.name }, function (err, owners) {
-                if (!err) {
-                    if (owners.length != 0) {
-                        res.render('owner', { owners: owners })
-                    } else {
-                        res.redirect('/data')
-                    }
+        Owner.find({ name: req.query.name }, function (err, owners) {
+            if (!err) {
+                if (owners.length != 0) {
+                    res.render('owner', { owners: owners })
                 } else {
                     res.redirect('/data')
                 }
-            })
-        } else {
-            res.redirect('/login')
-        }
+            } else {
+                res.redirect('/data')
+            }
+        })
     })
     .post(function (req, res) {
 
@@ -167,7 +137,7 @@ app.route('/owner')
             const d = new Date();
             const currentMonth = d.getMonth() + 1;
             const currentYear = d.getFullYear();
-            Owner.updateOne({ _id: req.body.ownerId }, { $set: { nextPayment: newDate, note: "تم القبض يوم " + nextPayment + " مبلغ " + amount, byWho: req.user.username } }, function (err, result) {
+            Owner.updateOne({ _id: req.body.ownerId }, { $set: { nextPayment: newDate, note: "تم القبض يوم " + nextPayment + " مبلغ " + amount } }, function (err, result) {
                 if (!err) {
                     console.log("Successfully Updated owner.🌚")
                     Total.findOne({ monthNumber: currentMonth, year: currentYear }, function (err, month) {
@@ -248,17 +218,13 @@ app.route('/edit/:ownerId')
 
 app.route("/total")
     .get(function (req, res) {
-        if (req.isAuthenticated()) {
-            Total.find({}, function (err, total) {
-                if (!err) {
-                    res.render('total', { total: total })
-                } else {
-                    res.redirect('/data')
-                }
-            })
-        } else {
-            res.redirect('/login')
-        }
+        Total.find({}, function (err, total) {
+            if (!err) {
+                res.render('total', { total: total })
+            } else {
+                res.redirect('/data')
+            }
+        })
     })
     .post (function (req, res) {
 
@@ -287,7 +253,6 @@ app.route("/total")
 app.post('/delete/:ownerId', function (req, res) {
 
     const deleteReason = req.body.why
-    const name = req.user.username
 
     Owner.findById({ _id: req.params.ownerId }, function (err, owner) {
         if (!err) {
@@ -341,66 +306,56 @@ app.post('/delete/:ownerId', function (req, res) {
 })
 
 app.get('/deletedList', function (req, res) {
-    if (req.isAuthenticated()) {
-        DeletedOwner.find({}, function (err, ownersFound) {
-            if (!err) {
-                if (ownersFound) {
-                    const deleted = ownersFound.filter((o) => {
-                        return {id: o.id, name: o.name, note: o.note, who: req.user.username}
-                    })
+    
+    DeletedOwner.find({}, function (err, ownersFound) {
+        if (!err) {
+            if (ownersFound) {
+                const deleted = ownersFound.filter((o) => {
+                    return {id: o.id, name: o.name, note: o.note}
+                })
 
-                    res.render('deletedList', { owners: deleted.reverse() })
-                }
-            } else {
-                console.log(err)
+                res.render('deletedList', { owners: deleted.reverse() })
             }
+        } else {
+            console.log(err)
+        }
 
-        })
-
-
-    } else {
-        console.log("Not authorized")
-        res.redirect('/login')
-    }
+    })
 })
 
 app.post('/restore', function (req, res) {
-    if (req.isAuthenticated()) {
-        DeletedOwner.findById({ _id: req.body.ownerId }, async function (err, owner) {
-            if (!err) {
-                if (owner) {
-                    const newOwner = new Owner({
-                        name: owner.name,
-                        nationalId: owner.nationalId,
-                        nextPayment: owner.nextPayment,
-                        amount: owner.amount,
-                        amountPerMonth: owner.amountPerMonth,
-                        category: owner.category,
-                        note: "كان محزوف و لسه راجع"
-                    })
-                    newOwner.save(err => {
-                        if (err) {
-                            console.log(err);
-                        } else {
-                            console.log("Successfully added user back to owners collection.");
-                            DeletedOwner.deleteOne({ _id: req.body.ownerId }, function (err) {
-                                if (!err) {
-                                    console.log("Successfully deleted user from deleted list collection.")
-                                    res.redirect('/deletedList')
-                                }
-                            })
-                        }
-                    })
+    DeletedOwner.findById({ _id: req.body.ownerId }, async function (err, owner) {
+        if (!err) {
+            if (owner) {
+                const newOwner = new Owner({
+                    name: owner.name,
+                    nationalId: owner.nationalId,
+                    nextPayment: owner.nextPayment,
+                    amount: owner.amount,
+                    amountPerMonth: owner.amountPerMonth,
+                    category: owner.category,
+                    note: "كان محزوف و لسه راجع"
+                })
+                newOwner.save(err => {
+                    if (err) {
+                        console.log(err);
+                    } else {
+                        console.log("Successfully added user back to owners collection.");
+                        DeletedOwner.deleteOne({ _id: req.body.ownerId }, function (err) {
+                            if (!err) {
+                                console.log("Successfully deleted user from deleted list collection.")
+                                res.redirect('/deletedList')
+                            }
+                        })
+                    }
+                })
 
-                }
-            } else {
-                console.log(err)
-                res.redirect('/data')
             }
-        })
-    } else {
-        res.redirect('/login')
-    }
+        } else {
+            console.log(err)
+            res.redirect('/data')
+        }
+    })
 
 
 
@@ -414,16 +369,6 @@ app.post('/deleteForever', function (req, res) {
             res.redirect('/deletedList')
         }
     })
-})
-
-app.post('/logout', function (req, res) {
-    req.logout(function (err) {
-        if (err) {
-            console.log(err)
-        } else {
-            res.redirect('/')
-        }
-    });
 })
 
 let port = process.env.PORT;
